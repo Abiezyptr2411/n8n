@@ -2,6 +2,8 @@ const express = require('express');
 const midtransClient = require('midtrans-client');
 const axios = require('axios');
 const path = require('path');
+const { Pool } = require('pg');
+
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
 }
@@ -10,24 +12,17 @@ const app = express();
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// ─── In-memory Transaction Store ─────────────────────────────────────────────
-const transactions = [];
+// ─── Database (Supabase) ──────────────────────────────────────────────────────
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-function upsertTransaction(data) {
-  const idx = transactions.findIndex(t => t.order_id === data.order_id);
-  const record = {
-    order_id:           data.order_id,
-    amount:             data.gross_amount || data.amount || 0,
-    status:             data.transaction_status || 'pending',
-    payment_type:       data.payment_type || '-',
-    customer_email:     data.customer_details?.email || data.customerEmail || '-',
-    customer_name:      data.customer_details?.first_name || data.customerName || '-',
-    updated_at:         new Date().toISOString(),
-    created_at:         idx >= 0 ? transactions[idx].created_at : new Date().toISOString(),
-  };
-  if (idx >= 0) transactions[idx] = record;
-  else transactions.unshift(record);
-}
+// ─── Midtrans ─────────────────────────────────────────────────────────────────
+const snap = new midtransClient.Snap({
+  isProduction: false,
+  serverKey: process.env.MIDTRANS_SERVER_KEY
+});
 
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
@@ -36,12 +31,19 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard.html'));
 });
 
-// GET all transactions (for dashboard)
-app.get('/transactions', (req, res) => {
-  res.json({ data: transactions, total: transactions.length });
+// GET all transactions dari Supabase
+app.get('/transactions', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM transactions ORDER BY created_at DESC LIMIT 100`
+    );
+    res.json({ data: result.rows, total: result.rowCount });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// POST create transaction
+// POST create transaction → simpan ke DB dengan status pending
 app.post('/create-transaction', async (req, res) => {
   const { orderId, amount, customerEmail, customerName } = req.body;
 
@@ -53,14 +55,13 @@ app.post('/create-transaction', async (req, res) => {
   try {
     const transaction = await snap.createTransaction(parameter);
 
-    // Simpan ke store dengan status pending
-    upsertTransaction({
-      order_id:           orderId,
-      gross_amount:       amount,
-      transaction_status: 'pending',
-      customerEmail,
-      customerName,
-    });
+    // Simpan ke Supabase langsung saat create
+    await pool.query(
+      `INSERT INTO transactions (order_id, status, amount, customer_email, customer_name)
+       VALUES ($1, 'pending', $2, $3, $4)
+       ON CONFLICT (order_id) DO NOTHING`,
+      [orderId, amount, customerEmail, customerName]
+    );
 
     res.json({ token: transaction.token, redirect_url: transaction.redirect_url });
   } catch (error) {
@@ -68,10 +69,34 @@ app.post('/create-transaction', async (req, res) => {
   }
 });
 
-// POST terima notifikasi dari Midtrans → forward ke n8n → update store
+// POST terima notifikasi dari Midtrans → update DB → forward ke n8n
 app.post('/midtrans-notification', async (req, res) => {
   try {
-    upsertTransaction(req.body);
+    const {
+      order_id,
+      transaction_status,
+      gross_amount,
+      payment_type,
+      customer_details
+    } = req.body;
+
+    // Upsert ke Supabase
+    await pool.query(
+      `INSERT INTO transactions (order_id, status, amount, payment_type, customer_email)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (order_id) DO UPDATE SET
+         status       = EXCLUDED.status,
+         amount       = EXCLUDED.amount,
+         payment_type = EXCLUDED.payment_type,
+         customer_email = COALESCE(EXCLUDED.customer_email, transactions.customer_email)`,
+      [
+        order_id,
+        transaction_status,
+        parseInt(gross_amount) || 0,
+        payment_type || null,
+        customer_details?.email || null
+      ]
+    );
 
     // Forward ke n8n webhook
     await axios.post(process.env.N8N_WEBHOOK_URL, req.body);
@@ -81,32 +106,31 @@ app.post('/midtrans-notification', async (req, res) => {
   }
 });
 
-// POST manual sync → kirim ulang semua transaksi ke n8n
+// POST manual sync → kirim semua transaksi ke n8n
 app.post('/sync-n8n', async (req, res) => {
   try {
-    const results = [];
-    for (const tx of transactions) {
-      const r = await axios.post(process.env.N8N_WEBHOOK_URL, {
+    const result = await pool.query(`SELECT * FROM transactions ORDER BY created_at DESC`);
+    const txList = result.rows;
+
+    for (const tx of txList) {
+      await axios.post(process.env.N8N_WEBHOOK_URL, {
         order_id:           tx.order_id,
         transaction_status: tx.status,
         gross_amount:       tx.amount,
         payment_type:       tx.payment_type,
         customer_details:   { email: tx.customer_email }
       });
-      results.push({ order_id: tx.order_id, n8n_status: r.status });
     }
-    res.json({ synced: results.length, results });
+
+    res.json({ synced: txList.length });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-const snap = new midtransClient.Snap({
-  isProduction: false,
-  serverKey: process.env.MIDTRANS_SERVER_KEY
-});
-
+// ─── Start Server ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Dashboard → http://localhost:${PORT}`);
 });
