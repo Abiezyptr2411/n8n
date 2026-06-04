@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Midtrans Payment Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0f1a;
+      --surface: #151828;
+      --card: #1c2035;
+      --border: #252a42;
+      --accent: #6c63ff;
+      --accent2: #00d4ff;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --radius: 14px;
+    }
+
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* HEADER */
+    header {
+      background: linear-gradient(135deg, #1c2035 0%, #151828 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .logo-text h1 { font-size: 16px; font-weight: 700; }
+    .logo-text p { font-size: 12px; color: var(--muted); }
+    .live-badge {
+      display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--success);
+      background: rgba(34,197,94,0.1); padding: 5px 12px; border-radius: 20px;
+      border: 1px solid rgba(34,197,94,0.2);
+    }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
+
+    main { padding: 28px 32px; max-width: 1300px; margin: 0 auto; }
+
+    /* STATS */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 16px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px; position: relative; overflow: hidden; transition: transform .2s, border-color .2s;
+    }
+    .stat-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+    .stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+    .stat-card.purple::before { background: linear-gradient(90deg,var(--accent),var(--accent2)); }
+    .stat-card.green::before  { background: linear-gradient(90deg,#22c55e,#16a34a); }
+    .stat-card.yellow::before { background: linear-gradient(90deg,#f59e0b,#d97706); }
+    .stat-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing:.5px; }
+    .stat-value { font-size: 28px; font-weight: 700; }
+    .stat-icon { position: absolute; right: 18px; top: 18px; font-size: 24px; opacity: .3; }
+
+    /* TWO COLUMN LAYOUT */
+    .layout { display: grid; grid-template-columns: 380px 1fr; gap: 24px; align-items: start; }
+    @media(max-width:900px){ .layout { grid-template-columns: 1fr; } }
+
+    /* FORM CARD */
+    .form-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden; position: sticky; top: 90px;
+    }
+    .form-header {
+      padding: 18px 20px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .form-header span { font-size: 16px; }
+    .form-header h2 { font-size: 15px; font-weight: 600; }
+    .form-header p { font-size: 12px; color: var(--muted); }
+    .form-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+
+    .field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing:.4px; }
+    .field input, .field select {
+      width: 100%; background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px; padding: 10px 13px; font-size: 14px;
+      font-family: inherit; outline: none; transition: border-color .2s;
+    }
+    .field input:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,99,255,.15); }
+    .field input::placeholder { color: var(--muted); }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 11px 20px; border-radius: 10px; font-size: 14px; font-weight: 600;
+      border: none; cursor: pointer; transition: all .2s; width: 100%;
+    }
+    .btn-primary { background: linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; }
+    .btn-primary:hover { opacity:.9; transform:translateY(-1px); box-shadow:0 4px 20px rgba(108,99,255,.4); }
+    .btn-primary:active { transform:translateY(0); }
+    .btn-primary:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+    .btn-success { background: linear-gradient(135deg,#22c55e,#16a34a); color:#fff; }
+    .btn-success:hover { opacity:.9; transform:translateY(-1px); box-shadow:0 4px 20px rgba(34,197,94,.3); }
+    .btn-success:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+    .btn-secondary { background:var(--card); border:1px solid var(--border); color:var(--text); }
+    .btn-secondary:hover { border-color:var(--accent); color:var(--accent); }
+    .btn-sm { width:auto; padding:8px 16px; font-size:13px; }
+
+    .divider { border:none; border-top:1px solid var(--border); margin: 4px 0; }
+
+    /* result box */
+    .result-box {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px; font-size: 12px; display: none;
+    }
+    .result-box.show { display: block; }
+    .result-box .res-label { color: var(--muted); margin-bottom: 4px; }
+    .result-box .res-val { color: var(--accent2); word-break: break-all; font-family: monospace; }
+
+    /* TABLE SECTION */
+    .table-section {}
+    .toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px; flex-wrap: wrap; gap: 12px;
+    }
+    .toolbar-title { font-size: 15px; font-weight: 600; }
+    .toolbar-actions { display: flex; gap: 10px; align-items: center; }
+    .refresh-info { font-size: 12px; color: var(--muted); }
+
+    .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    thead { background: var(--surface); }
+    thead th { padding:13px 16px; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; text-align:left; }
+    tbody tr { border-top: 1px solid var(--border); transition: background .15s; }
+    tbody tr:hover { background: rgba(108,99,255,.05); }
+    tbody td { padding: 13px 16px; font-size: 14px; }
+
+    .badge { display:inline-block; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+    .badge-settlement { background:rgba(34,197,94,.15); color:#22c55e; }
+    .badge-pending    { background:rgba(245,158,11,.15); color:#f59e0b; }
+    .badge-cancel,.badge-expire,.badge-deny { background:rgba(239,68,68,.15); color:#ef4444; }
+
+    .order-id { font-family:monospace; font-size:12px; color:var(--accent2); }
+
+    /* simulate btn in table */
+    .btn-sim {
+      padding: 5px 10px; font-size: 11px; font-weight: 600;
+      border-radius: 6px; border: none; cursor: pointer;
+      background: rgba(34,197,94,.15); color: #22c55e;
+      transition: all .2s;
+    }
+    .btn-sim:hover { background: rgba(34,197,94,.3); }
+    .btn-sim:disabled { opacity:.4; cursor:not-allowed; }
+
+    .empty-state { text-align:center; padding:50px 20px; color:var(--muted); }
+    .empty-state .icon { font-size:40px; margin-bottom:12px; opacity:.5; }
+    .empty-state p { font-size:14px; }
+
+    /* TOAST */
+    #toast-container { position:fixed; bottom:24px; right:24px; display:flex; flex-direction:column; gap:10px; z-index:999; }
+    .toast {
+      background:var(--card); border:1px solid var(--border); border-radius:10px;
+      padding:14px 18px; font-size:14px; display:flex; align-items:center; gap:10px;
+      animation: slideIn .3s ease; min-width:280px;
+    }
+    .toast.success { border-left:4px solid var(--success); }
+    .toast.error   { border-left:4px solid var(--danger); }
+    @keyframes slideIn { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
+
+    .spinner { width:15px; height:15px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .6s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    .progress-bar { height:3px; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:2px; transition:width 1s linear; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">💳</div>
+    <div class="logo-text">
+      <h1>Payment Dashboard</h1>
+      <p>Midtrans × n8n Integration</p>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="live-badge"><span class="live-dot"></span>LIVE</span>
+  </div>
+</header>
+
+<main>
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat-card purple">
+      <div class="stat-label">Total Transaksi</div>
+      <div class="stat-value" id="stat-total">0</div>
+      <div class="stat-icon">📊</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">Settlement</div>
+      <div class="stat-value" id="stat-settlement">0</div>
+      <div class="stat-icon">✅</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-label">Pending</div>
+      <div class="stat-value" id="stat-pending">0</div>
+      <div class="stat-icon">⏳</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-label">Total Revenue</div>
+      <div class="stat-value" id="stat-revenue">Rp 0</div>
+      <div class="stat-icon">💰</div>
+    </div>
+  </div>
+
+  <!-- LAYOUT: FORM + TABLE -->
+  <div class="layout">
+
+    <!-- FORM -->
+    <div class="form-card">
+      <div class="form-header">
+        <span>🆕</span>
+        <div>
+          <h2>Buat Transaksi</h2>
+          <p>Submit form untuk trigger ke n8n</p>
+        </div>
+      </div>
+      <div class="form-body">
+        <div class="field">
+          <label>Order ID</label>
+          <input type="text" id="f-orderid" placeholder="ORDER-001" />
+        </div>
+        <div class="field">
+          <label>Amount (Rp)</label>
+          <input type="number" id="f-amount" placeholder="100000" min="1000" />
+        </div>
+        <div class="field">
+          <label>Nama Customer</label>
+          <input type="text" id="f-name" placeholder="Nama lengkap" />
+        </div>
+        <div class="field">
+          <label>Email Customer</label>
+          <input type="email" id="f-email" placeholder="email@gmail.com" />
+        </div>
+
+        <button class="btn btn-primary" id="btn-create" onclick="createTransaction()">
+          💳 Buat Transaksi
+        </button>
+
+        <!-- Result setelah create -->
+        <div class="result-box" id="create-result">
+          <div class="res-label">Payment Token:</div>
+          <div class="res-val" id="res-token">-</div>
+          <div class="res-label" style="margin-top:8px">Payment URL:</div>
+          <div class="res-val" id="res-url">-</div>
+        </div>
+
+        <hr class="divider"/>
+
+        <!-- Simulasi Settlement -->
+        <div style="font-size:12px;color:var(--muted);text-align:center">— atau simulasi status pembayaran —</div>
+
+        <div class="field">
+          <label>Order ID untuk Simulasi</label>
+          <input type="text" id="f-sim-orderid" placeholder="ORDER-001" />
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="f-sim-status">
+            <option value="settlement">✅ Settlement (Lunas)</option>
+            <option value="pending">⏳ Pending</option>
+            <option value="cancel">❌ Cancel</option>
+            <option value="expire">⏰ Expire</option>
+            <option value="deny">🚫 Deny</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Payment Type</label>
+          <select id="f-sim-type">
+            <option value="bank_transfer">Bank Transfer</option>
+            <option value="credit_card">Credit Card</option>
+            <option value="qris">QRIS</option>
+            <option value="gopay">GoPay</option>
+            <option value="shopeepay">ShopeePay</option>
+          </select>
+        </div>
+
+        <button class="btn btn-success" id="btn-sim" onclick="simulateNotification()">
+          ⚡ Simulasi & Trigger n8n
+        </button>
+      </div>
+    </div>
+
+    <!-- TABLE SECTION -->
+    <div class="table-section">
+      <div class="toolbar">
+        <div>
+          <div class="toolbar-title">Riwayat Transaksi</div>
+          <div style="height:3px;margin-top:4px;width:60px">
+            <div class="progress-bar" id="progress" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="toolbar-actions">
+          <span class="refresh-info" id="last-refresh">–</span>
+          <button class="btn btn-secondary btn-sm" onclick="loadTransactions()">🔄 Refresh</button>
+          <button class="btn btn-primary btn-sm" id="btn-sync" onclick="syncN8n()">⚡ Sync Semua ke n8n</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Order ID</th>
+              <th>Customer</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Payment</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="tx-body">
+            <tr><td colspan="7"><div class="empty-state"><div class="icon">📭</div><p>Belum ada transaksi. Isi form dan klik "Buat Transaksi"!</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="toast-container"></div>
+
+<script>
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function formatRp(n) { return 'Rp ' + Number(n).toLocaleString('id-ID'); }
+  function formatDate(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    return d.toLocaleDateString('id-ID',{day:'2-digit',month:'short'}) + ' ' +
+           d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  }
+  function statusBadge(s) {
+    return `<span class="badge badge-${s||'pending'}">${(s||'pending').toUpperCase()}</span>`;
+  }
+  function genOrderId() {
+    return 'ORDER-' + Date.now().toString().slice(-8);
+  }
+  function toast(msg, type='success') {
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+  function setLoading(btnId, loading, defaultHtml) {
+    const btn = document.getElementById(btnId);
+    btn.disabled = loading;
+    btn.innerHTML = loading ? '<div class="spinner"></div> Loading…' : defaultHtml;
+  }
+
+  // ── Auto-fill Order ID ───────────────────────────────────────────────────────
+  document.getElementById('f-orderid').value = genOrderId();
+
+  // ── Create Transaction ───────────────────────────────────────────────────────
+  async function createTransaction() {
+    const orderId = document.getElementById('f-orderid').value.trim();
+    const amount  = document.getElementById('f-amount').value;
+    const name    = document.getElementById('f-name').value.trim();
+    const email   = document.getElementById('f-email').value.trim();
+
+    if (!orderId || !amount || !name || !email) {
+      toast('⚠️ Semua field wajib diisi!', 'error'); return;
+    }
+
+    setLoading('btn-create', true, '💳 Buat Transaksi');
+    try {
+      const res = await fetch('/create-transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, amount: Number(amount), customerEmail: email, customerName: name })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+
+      // Tampilkan hasil
+      document.getElementById('res-token').textContent = json.token;
+      document.getElementById('res-url').textContent   = json.redirect_url;
+      document.getElementById('create-result').classList.add('show');
+
+      // Auto-fill simulasi dengan order ID yang sama
+      document.getElementById('f-sim-orderid').value = orderId;
+
+      toast(`✅ Transaksi ${orderId} berhasil dibuat!`);
+      loadTransactions();
+
+      // Reset & generate order ID baru
+      document.getElementById('f-orderid').value = genOrderId();
+    } catch(e) {
+      toast('❌ Gagal: ' + e.message, 'error');
+    } finally {
+      setLoading('btn-create', false, '💳 Buat Transaksi');
+    }
+  }
+
+  // ── Simulate Notification (trigger n8n) ─────────────────────────────────────
+  async function simulateNotification(orderId, amount) {
+    // Bisa dipanggil dari form atau dari tombol di tabel
+    const oid    = orderId || document.getElementById('f-sim-orderid').value.trim();
+    const status = document.getElementById('f-sim-status')?.value || 'settlement';
+    const ptype  = document.getElementById('f-sim-type')?.value   || 'bank_transfer';
+
+    if (!oid) { toast('⚠️ Order ID untuk simulasi kosong!', 'error'); return; }
+
+    setLoading('btn-sim', true, '⚡ Simulasi & Trigger n8n');
+    try {
+      const res = await fetch('/midtrans-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id:           oid,
+          transaction_status: status,
+          gross_amount:       amount || Number(document.getElementById('f-amount').value || 0),
+          payment_type:       ptype,
+          customer_details:   { email: document.getElementById('f-email').value || '-' }
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+
+      toast(`⚡ Notifikasi ${status.toUpperCase()} dikirim ke n8n!`);
+      loadTransactions();
+    } catch(e) {
+      toast('❌ Gagal: ' + e.message, 'error');
+    } finally {
+      setLoading('btn-sim', false, '⚡ Simulasi & Trigger n8n');
+    }
+  }
+
+  // ── Simulate langsung dari baris tabel ──────────────────────────────────────
+  async function simFromTable(orderId, amount, btnEl) {
+    btnEl.disabled = true;
+    btnEl.textContent = '…';
+    try {
+      const res = await fetch('/midtrans-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id:           orderId,
+          transaction_status: 'settlement',
+          gross_amount:       amount,
+          payment_type:       'bank_transfer',
+          customer_details:   { email: '-' }
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      toast(`✅ ${orderId} → SETTLEMENT, n8n ter-trigger!`);
+      loadTransactions();
+    } catch(e) {
+      toast('❌ ' + e.message, 'error');
+      btnEl.disabled = false;
+      btnEl.textContent = '⚡ Settle';
+    }
+  }
+
+  // ── Load Transactions ────────────────────────────────────────────────────────
+  async function loadTransactions() {
+    try {
+      const res  = await fetch('/transactions');
+      const json = await res.json();
+      renderTable(json.data || []);
+      updateStats(json.data || []);
+      document.getElementById('last-refresh').textContent = 'Refresh: ' + new Date().toLocaleTimeString('id-ID');
+    } catch(e) {
+      toast('Gagal load: ' + e.message, 'error');
+    }
+  }
+
+  function renderTable(data) {
+    const tbody = document.getElementById('tx-body');
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">📭</div><p>Belum ada transaksi. Isi form dan klik "Buat Transaksi"!</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.map((tx, i) => `
+      <tr>
+        <td style="color:var(--muted)">${i+1}</td>
+        <td class="order-id">${tx.order_id}</td>
+        <td>
+          <div style="font-weight:500">${tx.customer_name||'-'}</div>
+          <div style="font-size:12px;color:var(--muted)">${tx.customer_email||'-'}</div>
+        </td>
+        <td style="font-weight:600">${formatRp(tx.amount)}</td>
+        <td>${statusBadge(tx.status)}</td>
+        <td style="font-size:13px;text-transform:capitalize">${tx.payment_type||'-'}</td>
+        <td>
+          ${tx.status === 'pending'
+            ? `<button class="btn-sim" onclick="simFromTable('${tx.order_id}',${tx.amount},this)">⚡ Settle</button>`
+            : `<span style="font-size:12px;color:var(--muted)">${formatDate(tx.updated_at)}</span>`
+          }
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function updateStats(data) {
+    document.getElementById('stat-total').textContent      = data.length;
+    document.getElementById('stat-settlement').textContent = data.filter(t=>t.status==='settlement').length;
+    document.getElementById('stat-pending').textContent    = data.filter(t=>t.status==='pending').length;
+    const rev = data.filter(t=>t.status==='settlement').reduce((s,t)=>s+Number(t.amount),0);
+    document.getElementById('stat-revenue').textContent    = formatRp(rev);
+  }
+
+  // ── Sync semua ke n8n ────────────────────────────────────────────────────────
+  async function syncN8n() {
+    setLoading('btn-sync', true, '⚡ Sync Semua ke n8n');
+    try {
+      const res  = await fetch('/sync-n8n', { method:'POST' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      toast(`✅ Sync ${json.synced} transaksi ke n8n berhasil!`);
+      loadTransactions();
+    } catch(e) {
+      toast('❌ Sync gagal: ' + e.message, 'error');
+    } finally {
+      setLoading('btn-sync', false, '⚡ Sync Semua ke n8n');
+    }
+  }
+
+  // ── Auto-refresh 15s ─────────────────────────────────────────────────────────
+  let cd = 15;
+  setInterval(() => {
+    cd--;
+    document.getElementById('progress').style.width = ((cd/15)*100)+'%';
+    if (cd <= 0) { cd = 15; loadTransactions(); }
+  }, 1000);
+
+  // ── Init ─────────────────────────────────────────────────────────────────────
+  loadTransactions();
+</script>
+</body>
+</html>
